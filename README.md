@@ -1,26 +1,21 @@
 # rndr.nvim
 
-`rndr.nvim` is a Neovim plugin backed by a native renderer that previews images and simple 3D assets directly inside the current buffer.
+Render images and simple 3D assets directly inside the current Neovim buffer.
 
-This is a compiled plugin. The Lua part runs inside Neovim, but the renderer is a C++ binary that users build during installation.
+`rndr.nvim` pairs a Lua plugin with a native C++ renderer. Open an image or model, run `:RndrOpen`, and the buffer is replaced with an in-place preview you can rerender, rotate, and restore.
 
-Supported inputs:
+## Showcase
+
+![Image preview showcase](showcase/dog.png)
+
+[Model showcase video](showcase/box_showcase.mp4)
+
+## What It Supports
 
 - Raster images: `png`, `jpg`, `jpeg`, `gif`, `bmp`, `webp`, `tga`, `psd`, `hdr`, `pic`, `pnm`, `ppm`, `pgm`, `pbm`
-- Vector images: `svg`, `svgz` via `rsvg-convert`, `magick`, or `convert`
+- Vector images: `svg`, `svgz`
 - Models: `obj`, `fbx`, `glb`, `gltf`, `dae`, `3ds`, `blend`, `ply`, `stl`, `x`, `off`
-
-## Layout
-
-```text
-.
-├── lua/rndr/             # Neovim plugin code
-├── lua/examples/         # Sample assets
-├── scripts/              # Build helpers for plugin managers and local installs
-└── renderer/             # Native renderer built with CMake
-    ├── src/
-    └── vendor/
-```
+- SVG rasterizers: `rsvg-convert`, `magick`, or `convert`
 
 ## Requirements
 
@@ -28,43 +23,35 @@ Required:
 
 - Neovim with Lua support
 - `git`
-- CMake 3.16+
+- CMake `3.16+`
 - A C++23-capable compiler
 
 Optional:
 
-- `rsvg-convert`, `magick`, or `convert` for SVG support
+- `rsvg-convert`, `magick`, or `convert` for SVG rendering
 
-You do not need to install `assimp` manually. The renderer build uses a system copy when available and otherwise fetches and builds a bundled copy automatically.
+`assimp` does not need to be installed manually. The renderer uses a system copy when available and otherwise builds a bundled copy during setup.
 
 ## Install
 
-Clone the repo:
+Clone the repository and build the native renderer:
 
 ```bash
 git clone https://github.com/SalarAlo/rndr.nvim.git
 cd rndr.nvim
-```
-
-Build the native renderer:
-
-```bash
 make
 ```
 
-That produces the binary at:
+This produces the renderer binary at `renderer/build/rndr`.
 
-```text
-renderer/build/rndr
+`make` is a thin wrapper around `./scripts/build_renderer.sh`. If you prefer raw CMake commands:
+
+```bash
+cmake -S renderer -B renderer/build -DCMAKE_BUILD_TYPE=Release
+cmake --build renderer/build --parallel --config Release
 ```
 
-`make` is a thin wrapper around `./scripts/build_renderer.sh`.
-
-The build script is intended to work on Linux and macOS. It configures CMake in `Release` mode by default and builds the renderer in the location the plugin already expects.
-
 ## Plugin Manager Setup
-
-For plugin managers, make the build step run after clone/update.
 
 `lazy.nvim`:
 
@@ -90,9 +77,7 @@ use({
 })
 ```
 
-If you want to keep the renderer somewhere else, override `renderer.bin` in `setup()`.
-
-If a user does not have `make`, they can use the script directly:
+If `make` is unavailable:
 
 ```lua
 {
@@ -101,16 +86,9 @@ If a user does not have `make`, they can use the script directly:
 }
 ```
 
-## Manual Build
+If you keep the binary somewhere else, override `renderer.bin` in `setup()`.
 
-If you prefer raw CMake commands, they are:
-
-```bash
-cmake -S renderer -B renderer/build -DCMAKE_BUILD_TYPE=Release
-cmake --build renderer/build --parallel --config Release
-```
-
-## Neovim Setup
+## Quick Start
 
 Minimal setup:
 
@@ -122,15 +100,7 @@ require("rndr").setup({
 })
 ```
 
-Check whether the binary and optional SVG tools are available:
-
-```vim
-:checkhealth rndr
-```
-
-## Usage
-
-Open an image or model file in Neovim, then run:
+Open a supported file and run:
 
 ```vim
 :RndrOpen
@@ -142,7 +112,13 @@ Or render a specific file directly:
 :RndrOpen lua/examples/dog.jpg
 ```
 
-Commands:
+Check whether the renderer binary and optional SVG tools are available:
+
+```vim
+:checkhealth rndr
+```
+
+## Commands
 
 - `:RndrOpen [path]`
 - `:RndrClose`
@@ -151,6 +127,8 @@ Commands:
 - `:RndrRotateUp`
 - `:RndrRotateDown`
 - `:RndrResetView`
+
+Rotation commands only affect model files.
 
 ## Configuration
 
@@ -207,28 +185,16 @@ require("rndr").setup({
 
 Notes:
 
-- The cleaner public shape is `preview`, `assets`, `window`, `renderer`, and `controls`.
-- Existing flat keys such as `auto_open`, `renderer_bin`, `render`, `size`, and `win_options` still work for backward compatibility.
-- Inspect the default config with `require("rndr").defaults()`.
-- By default, `renderer.bin` resolves to `<plugin-root>/renderer/build/rndr`.
-- First install can take longer if CMake needs to fetch and build `assimp`.
+- The public config shape is `preview`, `assets`, `window`, `renderer`, and `controls`.
+- Legacy flat keys such as `auto_open`, `renderer_bin`, `render`, `size`, and `win_options` still work.
+- Inspect defaults with `require("rndr").defaults()`.
+- `renderer.bin` defaults to `<plugin-root>/renderer/build/rndr`.
 - `preview.auto_open = true` registers autocommands for `preview.events`.
-- The preview is rendered in-place inside the current buffer.
-- Use `:RndrClose` to restore the original buffer contents after previewing.
-- `preview.render_on_resize = true` rerenders active previews when Neovim windows resize.
+- `preview.render_on_resize = true` rerenders visible previews when Neovim windows resize.
 - SVG files are rasterized into Neovim's cache directory before rendering.
-- Rotation commands only apply to model files.
-
-## Publishing Notes
-
-For a compiled Neovim plugin, the usual publish flow is:
-
-1. Push this repo to GitHub.
-2. Keep the install command in the README and plugin manager examples pointed at `make`.
-3. Tag releases such as `v0.1.0` so users can pin versions.
-4. Make sure `renderer/build/` stays out of the repo.
-
-That is enough for `lazy.nvim`, `packer.nvim`, and similar plugin managers to treat the repo as installable.
+- The preview is rendered in-place in the current buffer.
+- Use `:RndrClose` to restore the original buffer contents.
+- First install can take longer if CMake needs to fetch and build `assimp`.
 
 ## Manual Renderer Usage
 
@@ -238,10 +204,13 @@ The renderer can also be called directly:
 ./renderer/build/rndr <file> <term-width> <term-height> [supersample] [yaw] [pitch] [brightness] [saturation] [contrast] [gamma] [background]
 ```
 
-Example:
+## Project Layout
 
-```bash
-./renderer/build/rndr lua/examples/dog.jpg 100 40
+```text
+.
+├── lua/rndr/             # Neovim plugin code
+├── lua/examples/         # Sample assets
+├── renderer/             # Native renderer built with CMake
+├── scripts/              # Build helpers
+└── showcase/             # README media
 ```
-
-The plugin uses `--stdio` mode internally.
