@@ -3,14 +3,20 @@ local util = require("rndr.core.util")
 local M = {}
 
 local ns = vim.api.nvim_create_namespace("rndr_colors")
-local hl_pool_size = 4096
 local hl_group_by_color = {}
 local hl_refcount_by_color = {}
 local hl_active_colors_by_buf = {}
 local hl_free_groups = {}
+local hl_group_serial = 0
 
-for index = hl_pool_size, 1, -1 do
-	hl_free_groups[#hl_free_groups + 1] = "RndrColor_" .. index
+local function alloc_highlight_group()
+	local reused = table.remove(hl_free_groups)
+	if reused then
+		return reused
+	end
+
+	hl_group_serial = hl_group_serial + 1
+	return "RndrColor_" .. hl_group_serial
 end
 
 local function release_buffer_highlights(buf)
@@ -49,11 +55,7 @@ local function highlight_group_for(fg_hex, bg_hex)
 		return group, key
 	end
 
-	group = table.remove(hl_free_groups)
-	if not group then
-		return nil
-	end
-
+	group = alloc_highlight_group()
 	vim.api.nvim_set_hl(0, group, { fg = "#" .. normalized_fg, bg = "#" .. normalized_bg })
 	hl_group_by_color[key] = group
 
