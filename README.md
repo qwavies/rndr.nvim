@@ -8,7 +8,7 @@ Render images and simple 3D assets directly inside the current Neovim buffer.
 
 ![Image preview showcase](showcase/dog.png)
 
-[Model showcase video](showcase/box_showcase.mp4)
+<video src="https://raw.githubusercontent.com/SalarAlo/rndr.nvim/main/showcase/box_showcase.mp4" controls muted loop playsinline width="100%"></video>
 
 ## What It Supports
 
