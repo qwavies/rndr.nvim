@@ -11,9 +11,11 @@ if(NOT assimp_FOUND)
 	find_package(assimp QUIET)
 endif()
 
+set(RNDR_BUNDLED_ASSIMP OFF)
 if(NOT assimp_FOUND)
 	message(STATUS "assimp not found locally; fetching a bundled copy")
 	include(FetchContent)
+	set(RNDR_BUNDLED_ASSIMP ON)
 
 	set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 	set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -29,6 +31,18 @@ if(NOT assimp_FOUND)
 	)
 
 	FetchContent_MakeAvailable(assimp)
+endif()
+
+if(RNDR_BUNDLED_ASSIMP AND TARGET assimp)
+	find_path(
+		RNDR_MINIZIP_INCLUDE_DIR
+		NAMES unzip.h
+		PATH_SUFFIXES minizip
+	)
+
+	if(RNDR_MINIZIP_INCLUDE_DIR)
+		target_include_directories(assimp SYSTEM PRIVATE "${RNDR_MINIZIP_INCLUDE_DIR}")
+	endif()
 endif()
 
 if(TARGET assimp::assimp)
