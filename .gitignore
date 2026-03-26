@@ -7,6 +7,9 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 
+# clang cache
+/renderer/.cache/
+
 # Editor/runtime files
 .nvimlog
 .DS_Store
