@@ -23,6 +23,17 @@ local function cleanup_state(buf)
 	state_store.remove(buf)
 end
 
+local function reset_state_without_restore(buf)
+	local state = state_store.get(buf)
+	if not state then
+		return
+	end
+
+	renderer.stop_job(state)
+	buffer.clear_render_state(buf)
+	state_store.remove(buf)
+end
+
 local function set_buffer_keymap(buf, lhs, rhs, desc)
 	if type(lhs) ~= "string" or lhs == "" then
 		return
@@ -161,10 +172,14 @@ function M.start(path, opts)
 
 	local state = ensure_state(source_buf)
 	renderer.reset_frame_state(state)
-	buffer.apply_window_options(vim.fn.bufwinid(source_buf), current_config)
+	local target_win = opts.target_win
+	if not util.is_valid_window(target_win) then
+		target_win = vim.fn.bufwinid(source_buf)
+	end
+	buffer.apply_window_options(target_win, current_config)
 	vim.o.termguicolors = current_config.termguicolors
 
-	local term_w, term_h = config_state.term_dimensions()
+	local term_w, term_h = config_state.term_dimensions(target_win)
 	local render = config_state.render_settings()
 	if not renderer.ensure_renderer(state, current_config, buffer) then
 		return
@@ -202,6 +217,33 @@ function M.open_for_buffer(target_buf)
 
 	M.start(vim.api.nvim_buf_get_name(target_buf), { source_buf = target_buf })
 	return true
+end
+
+function M.telescope_buffer_previewer_maker(filepath, bufnr, opts)
+	local ok, previewers = pcall(require, "telescope.previewers")
+	if not ok then
+		util.notify("telescope.nvim is not available", vim.log.levels.ERROR)
+		return
+	end
+
+	local absolute_path = vim.fn.fnamemodify(filepath, ":p")
+	if vim.fn.filereadable(absolute_path) ~= 1 or not assets.path_is_renderable(absolute_path, config_state.get()) then
+		previewers.buffer_previewer_maker(filepath, bufnr, opts)
+		return
+	end
+
+	vim.schedule(function()
+		if not util.is_valid_buffer(bufnr) then
+			return
+		end
+
+		local target_win = vim.fn.bufwinid(bufnr)
+		reset_state_without_restore(bufnr)
+		vim.bo[bufnr].modifiable = true
+		vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "Rendering preview..." })
+		vim.bo[bufnr].modifiable = false
+		M.start(absolute_path, { source_buf = bufnr, target_win = target_win })
+	end)
 end
 
 local function active_state_for_current_buffer()

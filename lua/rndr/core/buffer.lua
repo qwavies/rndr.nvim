@@ -8,6 +8,7 @@ local hl_refcount_by_color = {}
 local hl_active_colors_by_buf = {}
 local hl_free_groups = {}
 local hl_group_serial = 0
+local COLOR_QUANTIZATION_LEVELS = 32
 
 local function alloc_highlight_group()
 	local reused = table.remove(hl_free_groups)
@@ -47,8 +48,30 @@ local function highlight_group_for(fg_hex, bg_hex)
 		return nil
 	end
 
-	local normalized_fg = fg_hex:lower()
-	local normalized_bg = bg_hex:lower()
+	local function quantize_channel(channel)
+		local levels = COLOR_QUANTIZATION_LEVELS - 1
+		local value = tonumber(channel, 16)
+		if not value or levels <= 0 then
+			return channel:lower()
+		end
+
+		local quantized = math.floor(((value / 255) * levels) + 0.5)
+		local normalized = math.floor((quantized / levels) * 255 + 0.5)
+		return string.format("%02x", normalized)
+	end
+
+	local function quantize_hex(hex)
+		return table.concat({
+			quantize_channel(hex:sub(1, 2)),
+			quantize_channel(hex:sub(3, 4)),
+			quantize_channel(hex:sub(5, 6)),
+		})
+	end
+
+	-- Highlight groups are global and finite. Quantizing colors bounds the
+	-- number of fg/bg pairs so large renders cannot exhaust Neovim's limit.
+	local normalized_fg = quantize_hex(fg_hex)
+	local normalized_bg = quantize_hex(bg_hex)
 	local key = normalized_fg .. ":" .. normalized_bg
 	local group = hl_group_by_color[key]
 	if group then
@@ -81,6 +104,15 @@ local function mark_buffer_highlight(buf, key)
 	hl_refcount_by_color[key] = (hl_refcount_by_color[key] or 0) + 1
 end
 
+function M.clear_render_state(source_buf)
+	if not util.is_valid_buffer(source_buf) then
+		return
+	end
+
+	vim.api.nvim_buf_clear_namespace(source_buf, ns, 0, -1)
+	release_buffer_highlights(source_buf)
+end
+
 function M.preserve_source_buffer(state)
 	local source_buf = state.source_buf
 	if not util.is_valid_buffer(source_buf) or state.original_lines ~= nil then
@@ -105,8 +137,7 @@ function M.restore_source_buffer(state)
 	vim.bo[source_buf].modifiable = state.original_modifiable
 	vim.bo[source_buf].readonly = state.original_readonly
 	vim.bo[source_buf].modified = state.original_modified
-	vim.api.nvim_buf_clear_namespace(source_buf, ns, 0, -1)
-	release_buffer_highlights(source_buf)
+	M.clear_render_state(source_buf)
 	state.rendered = false
 end
 
@@ -140,8 +171,7 @@ function M.render_frame(state, rows)
 	vim.bo[source_buf].modified = false
 	state.rendered = true
 
-	vim.api.nvim_buf_clear_namespace(source_buf, ns, 0, -1)
-	release_buffer_highlights(source_buf)
+	M.clear_render_state(source_buf)
 
 	for row_index, row in ipairs(rows) do
 		local cell_count = vim.fn.strchars(row.text)

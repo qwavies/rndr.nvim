@@ -3,7 +3,7 @@ local util = require("rndr.core.util")
 local M = {}
 
 local legacy_defaults = {
-	auto_open = false,
+	auto_open = true,
 	auto_open_events = { "BufReadPost" },
 	image_extensions = { "png", "jpg", "jpeg", "gif", "bmp", "webp", "tga", "psd", "hdr", "pic", "pnm", "ppm", "pgm", "pbm" },
 	vector_extensions = { "svg", "svgz" },
@@ -153,15 +153,19 @@ function M.render_settings()
 	}
 end
 
-function M.term_dimensions()
+function M.term_dimensions(target_win)
 	local size = (current.window or {}).size or {}
 	local min_width = math.max(1, size.min_width or 1)
 	local min_height = math.max(1, size.min_height or 1)
 	local width_offset = size.width_offset or 0
 	local height_offset = size.height_offset or 0
+	local win = target_win
+	if not win or win == 0 or not vim.api.nvim_win_is_valid(win) then
+		win = vim.api.nvim_get_current_win()
+	end
 
-	local term_w = math.max(min_width, vim.api.nvim_win_get_width(0) + width_offset)
-	local term_h = math.max(min_height, vim.api.nvim_win_get_height(0) + height_offset)
+	local term_w = math.max(min_width, vim.api.nvim_win_get_width(win) + width_offset)
+	local term_h = math.max(min_height, vim.api.nvim_win_get_height(win) + height_offset)
 
 	return term_w, term_h
 end

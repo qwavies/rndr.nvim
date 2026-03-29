@@ -92,6 +92,8 @@ make
 
 This produces the renderer binary at `renderer/build/rndr`.
 
+If `assimp` is not installed locally, CMake falls back to fetching a bundled copy during configure. That path still needs network access, so offline builds currently require a local `assimp` installation.
+
 `make` is a thin wrapper around `./scripts/build_renderer.sh`. If you prefer raw CMake commands:
 
 ```bash
@@ -106,7 +108,7 @@ Minimal setup:
 ```lua
 require("rndr").setup({
   preview = {
-    auto_open = false,
+    auto_open = true,
   },
 })
 ```
@@ -146,7 +148,7 @@ Rotation commands only affect model files.
 ```lua
 require("rndr").setup({
   preview = {
-    auto_open = false,
+    auto_open = true,
     events = { "BufReadPost" },
     render_on_resize = true,
   },
@@ -193,6 +195,20 @@ require("rndr").setup({
   },
 })
 ```
+
+Telescope preview override:
+
+```lua
+local rndr = require("rndr")
+
+require("telescope").setup({
+  defaults = {
+    buffer_previewer_maker = rndr.telescope_buffer_previewer_maker,
+  },
+})
+```
+
+This keeps Telescope's normal previewer for non-renderable files and swaps in `rndr` automatically for supported images and models.
 
 ## Manual Renderer Usage
 
